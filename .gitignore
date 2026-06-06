@@ -133,7 +133,7 @@ celerybeat.pid
 
 # Redis
 *.rdb
-*.aof
+*..aof
 *.pid
 
 # RabbitMQ
@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific ignores
+__pycache__/
+.venv/
+venv/
+.env
+*.pyc
+
