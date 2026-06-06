@@ -5,6 +5,7 @@ import re
 import os
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from collections import Counter
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
@@ -697,6 +698,7 @@ stock_period = st.sidebar.selectbox(
 stock_chart_type = st.sidebar.radio(
     "주가 차트 유형",
     ["선차트", "봉차트"],
+    index=1,
     horizontal=True,
     key="stock_chart_type_radio"
 )
@@ -1048,64 +1050,118 @@ if analyze_button or st.session_state.get("run_analysis", False):
                     else:
                         stock_chart_df["날짜"] = pd.to_datetime(stock_chart_df["date"]).dt.strftime("%m/%d")
 
-                    if stock_chart_type == "선차트":
-                        fig_price = px.line(
-                            stock_chart_df,
-                            x="날짜",
-                            y="종가",
-                            markers=True,
-                            title=f"{resolved_stock_name} 주가 추이 - {stock_period} / 선차트"
+                    fig_price = make_subplots(
+                        rows=2,
+                        cols=1,
+                        shared_xaxes=True,
+                        vertical_spacing=0.05,
+                        row_heights=[0.72, 0.28],
+                        subplot_titles=(
+                            f"{resolved_stock_name} 주가 추이 - {stock_period} / {stock_chart_type}",
+                            "거래량"
                         )
+                    )
 
-                        fig_price.update_traces(
-                            line=dict(width=4),
-                            marker=dict(size=7),
-                            hovertemplate=
-                            "<b>날짜: %{x}</b><br>" +
-                            "종가: %{y:,.0f}원<extra></extra>"
+                    if stock_chart_type == "선차트":
+                        fig_price.add_trace(
+                            go.Scatter(
+                                x=stock_chart_df["날짜"],
+                                y=stock_chart_df["종가"],
+                                mode="lines+markers",
+                                name="종가",
+                                line=dict(width=4, color="#0068C9"),
+                                marker=dict(size=7),
+                                hovertemplate=
+                                "<b>날짜: %{x}</b><br>" +
+                                "종가: %{y:,.0f}원<extra></extra>"
+                            ),
+                            row=1,
+                            col=1
                         )
 
                     else:
-                        fig_price = go.Figure(
-                            data=[
-                                go.Candlestick(
-                                    x=stock_chart_df["날짜"],
-                                    open=stock_chart_df["시가"],
-                                    high=stock_chart_df["고가"],
-                                    low=stock_chart_df["저가"],
-                                    close=stock_chart_df["종가"],
-                                    increasing_line_color="red",
-                                    decreasing_line_color="royalblue",
-                                    name="봉차트"
-                                )
-                            ]
+                        fig_price.add_trace(
+                            go.Candlestick(
+                                x=stock_chart_df["날짜"],
+                                open=stock_chart_df["시가"],
+                                high=stock_chart_df["고가"],
+                                low=stock_chart_df["저가"],
+                                close=stock_chart_df["종가"],
+                                increasing_line_color="red",
+                                decreasing_line_color="royalblue",
+                                name="봉차트",
+                                hovertext=[
+                                    f"시가: {open_:,.0f}원<br>"
+                                    f"고가: {high:,.0f}원<br>"
+                                    f"저가: {low:,.0f}원<br>"
+                                    f"종가: {close:,.0f}원"
+                                    for open_, high, low, close in zip(
+                                        stock_chart_df["시가"],
+                                        stock_chart_df["고가"],
+                                        stock_chart_df["저가"],
+                                        stock_chart_df["종가"]
+                                    )
+                                ],
+                                hovertemplate="<b>날짜: %{x}</b><br>%{hovertext}<extra></extra>"
+                            ),
+                            row=1,
+                            col=1
                         )
 
-                        fig_price.update_layout(
-                            title=f"{resolved_stock_name} 주가 추이 - {stock_period} / 봉차트",
-                            xaxis_rangeslider_visible=False
-                        )
-
-                    fig_price.update_layout(
-                        xaxis=dict(
-                            title=dict(
-                                text="날짜",
-                                font=dict(size=16, color="#333333")
-                            ),
-                            tickfont=dict(size=13, color="#333333")
+                    # 거래량 막대 추가
+                    fig_price.add_trace(
+                        go.Bar(
+                            x=stock_chart_df["날짜"],
+                            y=stock_chart_df["거래량"],
+                            name="거래량",
+                            marker_color="rgba(120, 120, 120, 0.45)",
+                            hovertemplate=
+                            "<b>날짜: %{x}</b><br>" +
+                            "거래량: %{y:,.0f}주<extra></extra>"
                         ),
-                        yaxis=dict(
-                            title=dict(
-                                text="주가",
-                                font=dict(size=16, color="#333333")
-                            ),
-                            tickfont=dict(size=13, color="#333333")
-                        ),
-                        title_font=dict(size=22),
-                        hoverlabel=dict(font_size=14)
+                        row=2,
+                        col=1
                     )
 
-                    st.plotly_chart(fig_price, use_container_width=True)
+                    fig_price.update_layout(
+                        height=750,
+                        title=dict(
+                            text=f"{resolved_stock_name} 주가·거래량 추이",
+                            font=dict(size=24)
+                        ),
+                        xaxis_rangeslider_visible=False,
+                        showlegend=True,
+                        hovermode="x unified",
+                        hoverlabel=dict(font_size=14),
+                        margin=dict(l=40, r=40, t=80, b=40)
+                    )
+
+                    fig_price.update_yaxes(
+                        title_text="주가",
+                        tickformat=",",
+                        row=1,
+                        col=1
+                    )
+
+                    fig_price.update_yaxes(
+                        title_text="거래량",
+                        tickformat=",",
+                        row=2,
+                        col=1
+                    )
+
+                    fig_price.update_xaxes(
+                        title_text="날짜",
+                        tickfont=dict(size=12),
+                        row=2,
+                        col=1
+                    )
+
+                    st.plotly_chart(
+                        fig_price,
+                        use_container_width=True,
+                        key="stock_price_volume_chart"
+                    )
 
                     st.subheader("뉴스 기사 수와 주가 변동 비교")
 
