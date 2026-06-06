@@ -1,7 +1,8 @@
-import streamlit as st
+ake_wordcloudimport streamlit as st
 import requests
 import pandas as pd
 import re
+import os
 import plotly.express as px
 import plotly.graph_objects as go
 from collections import Counter
@@ -366,12 +367,37 @@ def extract_keywords(text, custom_stopwords=None):
     return words
 
 
+def get_korean_font_path():
+    """
+    로컬 Windows와 Streamlit Cloud Linux 환경에서
+    각각 사용할 수 있는 한글 폰트 경로를 찾습니다.
+    """
+
+    font_candidates = [
+        "C:/Windows/Fonts/malgun.ttf",  # Windows 로컬
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",  # Streamlit Cloud + fonts-nanum
+        "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ]
+
+    for font_path in font_candidates:
+        if os.path.exists(font_path):
+            return font_path
+
+    return None
+
+
 def make_wordcloud(words):
     """워드클라우드 생성"""
     text = " ".join(words)
 
-    # Windows 기준 폰트
-    font_path = "C:/Windows/Fonts/malgun.ttf"
+    font_path = get_korean_font_path()
+
+    if font_path is None:
+        st.warning(
+            "한글 폰트를 찾지 못했습니다. Streamlit Cloud에서는 packages.txt에 fonts-nanum을 추가해 주세요."
+        )
+        return None
 
     wc = WordCloud(
         font_path=font_path,
@@ -798,7 +824,9 @@ if analyze_button or st.session_state.get("run_analysis", False):
 
                     with col_wc:
                         fig = make_wordcloud(words)
-                        st.pyplot(fig)
+
+                        if fig is not None:
+                            st.pyplot(fig)
 
                     with col_kw:
                         st.write("관련 키워드 TOP 30")
