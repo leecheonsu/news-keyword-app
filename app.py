@@ -595,24 +595,49 @@ def generate_ai_news_analysis(
     except Exception as e:
         error_text = str(e)
 
-        if "RESOURCE_EXHAUSTED" in error_text or "429" in error_text:
+        # Gemini 서버 혼잡 / 일시적 사용 불가
+        if "503" in error_text or "UNAVAILABLE" in error_text or "high demand" in error_text:
+            return {
+                "summary": (
+                    "현재 Gemini AI 서버 사용량이 많아 AI 요약을 생성하지 못했습니다.\n\n"
+                    "잠시 후 다시 시도해 주세요.\n"
+                    "AI 요약을 제외한 기본 기사 요약과 키워드 분석은 정상적으로 사용할 수 있습니다."
+                ),
+                "issues": [],
+                "investor_note": "temporary_unavailable"
+            }
+
+        # 무료 사용량 또는 요청 한도 초과
+        if "RESOURCE_EXHAUSTED" in error_text or "429" in error_text or "quota" in error_text.lower():
             return {
                 "summary": (
                     "Gemini API 무료 사용량 또는 요청 한도를 초과하여 AI 요약을 생성하지 못했습니다.\n\n"
-                    "해결 방법:\n"
-                    "- 잠시 후 다시 시도하세요.\n"
-                    "- Google AI Studio의 API 사용량과 rate limit을 확인하세요.\n"
-                    "- 필요하면 Google Cloud Billing을 연결해 유료 티어로 전환하세요.\n\n"
-                    "현재는 기본 기사 요약과 자동 인사이트만 표시됩니다."
+                    "잠시 후 다시 시도하거나, Google AI Studio에서 API 사용량과 한도를 확인해 주세요.\n"
+                    "현재는 기본 기사 요약과 키워드 분석만 표시됩니다."
                 ),
                 "issues": [],
                 "investor_note": "quota_exceeded"
             }
 
+        # API 키 누락 또는 인증 오류
+        if "API_KEY" in error_text or "authentication" in error_text.lower() or "permission" in error_text.lower():
+            return {
+                "summary": (
+                    "Gemini API 키 설정에 문제가 있어 AI 요약을 생성하지 못했습니다.\n\n"
+                    "Streamlit Secrets에 GEMINI_API_KEY가 올바르게 입력되어 있는지 확인해 주세요."
+                ),
+                "issues": [],
+                "investor_note": "api_key_error"
+            }
+
+        # 기타 오류
         return {
-            "summary": f"Gemini AI 분석 중 오류가 발생했습니다: {e}",
+            "summary": (
+                "AI 요약을 생성하는 중 일시적인 오류가 발생했습니다.\n\n"
+                "잠시 후 다시 시도해 주세요. 기본 기사 요약과 키워드 분석은 계속 사용할 수 있습니다."
+            ),
             "issues": [],
-            "investor_note": ""
+            "investor_note": "unknown_error"
         }
 
 # =========================
@@ -1461,7 +1486,13 @@ if analyze_button or st.session_state.get("run_analysis", False):
                             stock_change_rate=ai_stock_change_rate
                         )
 
-                    if ai_result.get("investor_note") in ["quota_exceeded", "missing_api_key"]:
+                    if ai_result.get("investor_note") in [
+                        "quota_exceeded",
+                        "missing_api_key",
+                        "temporary_unavailable",
+                        "api_key_error",
+                        "unknown_error"
+                    ]:
                         st.warning(ai_result["summary"])
 
                         st.subheader("기본 기사 요약")
